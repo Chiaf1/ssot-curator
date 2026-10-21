@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curator --version)",
+      "Bash(curator --help)",
+      "Bash(curator status *)",
+      "Bash(curator search *)",
+      "Bash(curator review *)",
+      "Bash(curator conflicts *)",
+      "Bash(curator quarantine *)",
+      "Bash(curator revisions *)",
+      "Bash(curator validate *)",
+      "Bash(curator schedule *)",
+      "Bash(curator entities)",
+      "Bash(curator entities --json)",
+      "Bash(curator doctor)",
+      "Bash(curator doctor --json)",
+      "Bash(curator types *)"
+    ],
+    "ask": [
+      "Bash(curator run *)",
+      "Bash(curator rebuild *)",
+      "Bash(curator approve *)",
+      "Bash(curator reject *)",
+      "Bash(curator resolve *)",
+      "Bash(curator release *)",
+      "Bash(curator discard *)",
+      "Bash(curator merge *)",
+      "Bash(curator link *)",
+      "Bash(curator separate *)",
+      "Bash(curator rename *)",
+      "Bash(curator alias *)",
+      "Bash(curator refile *)",
+      "Bash(curator forget *)",
+      "Bash(curator supersede-source *)",
+      "Bash(curator eval *)",
+      "Bash(curator backup *)",
+      "Bash(curator restore *)",
+      "Bash(curator migrate *)",
+      "Bash(curator render *)",
+      "Bash(curator init *)"
+    ],
+    "deny": [
+      "Edit(/raw/**)",
+      "Edit(/curated/**)",
+      "Edit(/state/**)",
+      "Edit(/ssot/**)",
+      "Edit(/curator.yaml)"
+    ]
+  }
+}

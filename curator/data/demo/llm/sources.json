@@ -1,0 +1,166 @@
+[
+  {
+    "match": "stops with alarm E104 overtemperature",
+    "response": {
+      "unclassified": [],
+      "suspicious_instructions": [],
+      "facts": [
+        {
+          "concept_type": "Problem",
+          "concept_key": {
+            "plant": "line BL2",
+            "symptom": "axis-in-overtemperature-alarm"
+          },
+          "field": {
+            "event": "occurrence"
+          },
+          "text": "Since 01/03/2026 axis 4 of line BL2 stops with alarm E104 overtemperature.",
+          "kind": "fact",
+          "quote": "since 01/03/2026 axis 4 of line BL2 stops with alarm E104 overtemperature",
+          "quote_lang": "en",
+          "location": "msg-fd08d81c",
+          "date": "2026-03-01",
+          "time_expression_raw": null,
+          "related": [
+            {
+              "type": "Axis",
+              "key": {
+                "plant": "BL2",
+                "address": "4"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "match": "We replaced the fan of the axis 4 drive",
+    "response": {
+      "unclassified": [],
+      "suspicious_instructions": [],
+      "facts": [
+        {
+          "concept_type": "Problem",
+          "concept_key": {
+            "plant": "line BL2",
+            "symptom": "axis-in-overtemperature-alarm"
+          },
+          "field": {
+            "event": "attempt"
+          },
+          "text": "The fan of the axis 4 drive was replaced: the alarm has not appeared again.",
+          "kind": "fact",
+          "quote": "We replaced the fan of the axis 4 drive: the alarm has not appeared again",
+          "quote_lang": "en",
+          "location": "msg-60af0286",
+          "date": "2026-03-03",
+          "time_expression_raw": null,
+          "related": [
+            {
+              "type": "Axis",
+              "key": {
+                "plant": "BL2",
+                "address": "4"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "match": "SERVICE TICKET No. 7002",
+    "response": {
+      "unclassified": [],
+      "suspicious_instructions": [],
+      "facts": [
+        {
+          "concept_type": "ServiceTicket",
+          "concept_key": {
+            "number": "7002"
+          },
+          "field": {
+            "attribute": "description"
+          },
+          "text": "Alarm E104 overtemperature on axis 4.",
+          "kind": "fact",
+          "quote": "Description Alarm E104 overtemperature on axis 4",
+          "quote_lang": "en",
+          "location": "p1",
+          "date": null,
+          "time_expression_raw": null,
+          "related": [
+            {
+              "type": "Axis",
+              "key": {
+                "plant": "BL2",
+                "address": "4"
+              }
+            }
+          ]
+        },
+        {
+          "concept_type": "ServiceTicket",
+          "concept_key": {
+            "number": "7002"
+          },
+          "field": {
+            "event": "action"
+          },
+          "text": "On 03/03/2026 the fan of the axis 4 drive was replaced.",
+          "kind": "fact",
+          "quote": "Action 03/03/2026 replaced the fan of the axis 4 drive",
+          "quote_lang": "en",
+          "location": "p1",
+          "date": "2026-03-03",
+          "time_expression_raw": null,
+          "related": [
+            {
+              "type": "Axis",
+              "key": {
+                "plant": "BL2",
+                "address": "4"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "match": "gave no more alarm E104",
+    "response": {
+      "unclassified": [],
+      "suspicious_instructions": [],
+      "facts": [
+        {
+          "concept_type": "Problem",
+          "concept_key": {
+            "plant": "line BL2",
+            "symptom": "axis-in-overtemperature-alarm"
+          },
+          "field": {
+            "attribute": "status"
+          },
+          "text": "Axis 4 has given no more alarm E104.",
+          "kind": "fact",
+          "quote": "today axis 4 gave no more alarm E104",
+          "quote_lang": "en",
+          "location": "msg-d68c02ce",
+          "date": "2026-03-04",
+          "time_expression_raw": "today",
+          "related": [
+            {
+              "type": "Axis",
+              "key": {
+                "plant": "BL2",
+                "address": "4"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

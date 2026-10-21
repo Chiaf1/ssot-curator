@@ -1,0 +1,25 @@
+- id: rc-firmware
+  type: Axis
+  title: Axis 9 (bl2)
+  groups:
+    - kind: attribute
+      field: firmware
+      facts:
+        - {id: a, text: "The firmware of axis 9 is 1A20.", quote: "axis 9 has firmware 1A20", source: "delivery", source_date: "2026-03-01"}
+        - {id: b, text: "The firmware of axis 9 is 1B05.", quote: "the firmware of axis 9 changes to 1B05", source: "update", source_date: "2026-03-05"}
+        - {id: c, text: "The firmware of axis 9 is 1A19.", quote: "axis 9 has firmware 1A19", source: "customer", source_date: "2026-03-06"}
+  expect:
+    - {fact: b, relation: supersedes, target: a}
+    - {fact: c, relation: conflicts_with}
+- id: rc-same-event
+  type: Axis
+  title: Axis 9 (bl2)
+  groups:
+    - kind: event
+      field: replacement
+      date: "2026-03-07"
+      facts:
+        - {id: a, text: "The cable of axis 9 was replaced.", source: "report-a", source_date: "2026-03-07", event_date: "2026-03-07"}
+        - {id: b, text: "Axis 9 got a new cable.", source: "report-b", source_date: "2026-03-08", event_date: "2026-03-07"}
+  expect:
+    - {fact: b, relation: duplicate_of, target: a}

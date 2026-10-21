@@ -1,0 +1,181 @@
+# Type configuration: technical support of an industrial plant or machine (axes, network devices, alarms, procedures).
+# Derived from a type used on real data (support of an automated production line), made generic: DRAFT until it is
+# exercised on real data in this form. Used by `curator init --type plant-support`.
+# The folders of raw/ say HOW a source must be read (each folder has a reading hint for the LLM); inside a folder the
+# format is recognized by the extension.
+schema_version: 1
+status: draft
+
+instance:
+  name: ""
+  type: plant-support
+  language: en          # language of the content (facts): `curator init --language` changes it
+
+llm:
+  backend: claude-code
+  model: ""
+  timeout_seconds: 300
+  max_tokens_per_run: 400000
+  cache: true
+
+chunking:
+  max_tokens: 3000
+  overlap_tokens: 150
+  table_rows_per_chunk: 60
+
+source_date: [content, filename, mtime]
+
+ignore:
+  - "**/~$*"
+  - "**/*.{zip,bin,exe,dll,hex}"
+  - "**/Thumbs.db"
+  - "**/.DS_Store"
+
+sources:
+  - match: "notes/**/*.{txt,md}"
+    extractor: note
+    hint: "Notes written by the owner of this SSOT: first-hand knowledge, attributed to the owner."
+  - match: "notes/**/*"
+    extractor: auto
+    hint: "Notes collected by the owner of this SSOT."
+  - match: "service-reports/**/*"
+    extractor: auto
+    hint: >-
+      Service reports, tickets and intervention sheets: dated actions on the plant (who did what, when, with which
+      outcome), problems observed and their causes, ticket numbers and external references.
+  - match: "conversations/**/*"
+    extractor: auto
+    hint: >-
+      Mail and chat with the customer or colleagues: who reported what and when, problems, tests agreed and their
+      outcome. Opinions and hypotheses stay attributed to who wrote them.
+  - match: "manuals/**/*.pdf"
+    extractor: pdf
+    summarize: false
+    extract: [Procedure, Parameter, Alarm, DataPoint]
+    pages: {}            # e.g. {"big-manual*.pdf": "5-9"}: only these pages are read
+    hint: "A manual: extract only procedures, parameters, alarms and data points, with their page. Do not summarize."
+  - match: "technical-data/**/*"
+    extractor: auto
+    hint: "Technical tables, lists and schemes: one fact per row or item, values and names exactly as written."
+
+concepts:
+  Plant:
+    folder: plants
+    key: "{code}"
+    title: "Plant {code}"
+    summary: "Plants, lines and machines, by code."
+    description: "The plant, line or machine installed at a site, identified by its code (e.g. BL2)."
+    attributes: [code, customer, description, location, overall_status]
+    events: [configuration_change]
+    description_from: [description]
+    identity_rule: "Different plant codes are different plants."
+  Component:
+    folder: components
+    key: "{plant}/{name}"
+    title: "{name} ({plant})"
+    summary: "Parts of a plant that are not axes or network devices: sensors, valves, cables, supplies."
+    description: "A part of the plant that is not an axis or a network device (sensor, valve, conveyor, cable, power supply…)."
+    attributes: [component_type, model, location, function, status]
+    events: [replacement, failure]
+    description_from: [function, component_type]
+  Axis:
+    folder: axes
+    key: "{plant}/axis{address}"
+    title: "Axis {address} ({plant})"
+    summary: "Motorized axes and drives, by network address: function, drive, firmware, what happened to them."
+    description: >-
+      A motorized axis or drive of the plant, identified by its network address. It is the logical position, not the
+      physical drive: a drive moved to another position is a 'relocation' event.
+    attributes: [address, function, drive_model, network_device, firmware, connection_status]
+    events: [problem_observed, relocation, replacement, firmware_update, parameter_change]
+    description_from: [function]
+    identity_rule: "Different network addresses are different axes."
+  NetworkDevice:
+    folder: network-devices
+    key: "{plant}/{name}"
+    title: "{name} ({plant})"
+    summary: "Gateways, PLCs, couplers and switches of the plant network, and what is connected to them."
+    description: "A device on the plant network (gateway, PLC, bus coupler, switch) and what is connected to it."
+    attributes: [model, protocol, connected_devices, configuration, version]
+    events: [configuration_change]
+    description_from: [model, connected_devices]
+    identity_rule: "Different device names or codes are different devices."
+  DataPoint:
+    folder: datapoints
+    key: "{device}/{id}"
+    title: "{id} ({device})"
+    summary: "Values exchanged on the network or with the controller, and what they mean."
+    description: "A value exchanged on the network or with the controller (signal, register, dictionary object): what it means and how it is read or written."
+    attributes: [name, data_type, access, unit, meaning]
+    description_from: [name]
+  Parameter:
+    folder: parameters
+    key: "{system}/{name}"
+    title: "{name} ({system})"
+    summary: "Configuration parameters of devices and programs, with their values."
+    description: "A configuration parameter of a device or program: meaning, default and set value, unit."
+    attributes: [meaning, default, value, unit]
+    events: [change]
+    description_from: [meaning]
+  Alarm:
+    folder: alarms
+    key: "{system}/{code}"
+    title: "Alarm {code} ({system})"
+    summary: "Alarm and error codes: meaning, causes, remedies, how often they appear."
+    description: "An alarm or error code of a device or program: meaning, likely causes, remedies; each time it appears is an occurrence."
+    attributes: [description, causes, remedies]
+    events: [occurrence]
+    count_events: [occurrence]
+    description_from: [description]
+    identity_rule: "Different codes are different alarms of the same system."
+  Procedure:
+    folder: procedures
+    key: "{system}/{title}"
+    entity_proposals: true           # free titles: the same procedure can get two names
+    title: "{title} ({system})"
+    summary: "How to do things: step-by-step operating procedures."
+    description: "An operating procedure (e.g. change the network address of a drive, update a firmware, restore a backup)."
+    attributes: [system, title, steps, prerequisites, tools, warnings]
+    review_priority: high
+    description_from: [title]
+    identity_rule: "The same operation on the same system is the same procedure even if its title is worded differently."
+  Problem:
+    folder: problems
+    key: "{plant}/{symptom}"
+    entity_proposals: true           # symptoms named freely: duplicates with slightly different names
+    title: "{symptom} ({plant})"
+    summary: "Recurring problems, named by what is seen: occurrences, causes, attempts, current solution."
+    description: >-
+      A recurring problem, named by its observable SYMPTOM (what is seen), not by its cause (e.g. axis-loses-communication,
+      axis-does-not-reach-position). The same symptom with different causes stays one problem. Each report is an
+      'occurrence' event (with date and axis or component); causes found or suspected are 'cause' events (they add up,
+      they do not contradict each other); attempts are 'attempt' events with their outcome. 'resolution' is the
+      solution in use now.
+    attributes: [description, resolution, status]
+    events: [occurrence, cause, attempt]
+    count_events: [occurrence]
+    description_from: [description]
+    identity_rule: >-
+      The same observable SYMPTOM is the same problem ("same") even with different causes; different but related
+      symptoms (one the consequence of the other) are "similar". Generic names ("malfunction") are merged into the
+      specific symptom they describe.
+  ServiceTicket:
+    folder: tickets
+    key: "{number}"
+    title: "Service ticket {number}"
+    summary: "Support requests and work orders, with their actions and visits."
+    description: "A support request or work order, with its actions and visits, and the reference other organizations give it."
+    attributes: [number, external_ref, opened, closed, category, description, status]
+    events: [action, visit]
+    description_from: [description]
+    identity_rule: "Different ticket numbers are different tickets; an external reference always points to the same ticket."
+
+aliases: {}
+
+policy:
+  stale_after_days: 365
+  minimize_personal_data: true
+  quarantine_rules: default
+
+backup:
+  max_age_days: 7

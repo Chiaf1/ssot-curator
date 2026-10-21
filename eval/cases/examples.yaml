@@ -1,0 +1,27 @@
+- id: ticket-7001
+  source: "service-reports/TICKET 7001.pdf"
+  complete: true
+  expect:
+    - {type: ServiceTicket, key: {number: "7001"}, field: description, contains: ["axis 4", "network communication"]}
+    - {type: ServiceTicket, path: tickets/7001, field: action, contains: ["termination resistor"], date: "2026-02-04"}
+  absent:
+    - {contains: ["2B7C"], note: "invented firmware: must be rejected by quote verification"}
+- id: report-bl2
+  source: "service-reports/report BL2.docx"
+  complete: true
+  expect:
+    - {type: Problem, path: problems/bl2/axis-loses-communication, field: occurrence, contains: ["axis 4"], date: "2026-02-10"}
+    - {type: Problem, path: problems/bl2/axis-loses-communication, field: attempt, contains: ["segment A", "segment B"]}
+- id: note-change-address
+  source: "notes/2026-01-15_change-address.txt"
+  expect:
+    - {type: Procedure, field: steps, contains: ["Network", "Node address"]}
+- id: manual-firmware
+  source: "manuals/demo manual MX200.pdf"
+  anchors: [p2]
+  expect:
+    - {type: Procedure, key: {system: "mx200", title: "firmware-update"}, field: steps, contains: ["FwLoader"]}
+- id: datapoints-csv
+  source: "technical-data/datapoints.csv"
+  expect:
+    - {type: DataPoint, field: name, contains: ["Command word"]}

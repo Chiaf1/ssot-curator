@@ -1,0 +1,135 @@
+# Type configuration: support of a software product (tickets, versions, bugs, settings, procedures).
+# DRAFT: not yet exercised on real data; measure it with `curator eval` before relying on it.
+# Used by `curator init --type software-support`. The folders of raw/ say HOW a source must be read (each folder has a
+# reading hint for the LLM); inside a folder the format is recognized by the extension.
+schema_version: 1
+status: draft
+
+instance:
+  name: ""
+  type: software-support
+  language: en          # language of the content (facts): `curator init --language` changes it
+
+llm:
+  backend: claude-code
+  model: ""
+  timeout_seconds: 300
+  max_tokens_per_run: 400000
+  cache: true
+
+chunking:
+  max_tokens: 3000
+  overlap_tokens: 150
+  table_rows_per_chunk: 60
+
+source_date: [content, filename, mtime]
+
+ignore:
+  - "**/~$*"
+  - "**/*.{zip,exe,dll,bin,log}"
+  - "**/Thumbs.db"
+  - "**/.DS_Store"
+
+sources:
+  - match: "notes/**/*.{txt,md}"
+    extractor: note
+    hint: "Notes written by the owner of this SSOT: first-hand knowledge, attributed to the owner."
+  - match: "notes/**/*"
+    extractor: auto
+    hint: "Notes collected by the owner of this SSOT."
+  - match: "tickets/**/*"
+    extractor: auto
+    hint: >-
+      Exported support tickets: who reported what and when, product and version, symptom, steps tried, workaround,
+      resolution and status. Ticket numbers exactly as written.
+  - match: "conversations/**/*"
+    extractor: auto
+    hint: >-
+      Mail and chat with customers or colleagues: who reported what and when, problems, workarounds agreed.
+      Opinions and hypotheses stay attributed to who wrote them.
+  - match: "documents/**/*"
+    extractor: auto
+    hint: >-
+      Release notes, specifications, configuration exports and other documents of the product: versions, changes,
+      known bugs, settings with their values exactly as written.
+  - match: "manuals/**/*.pdf"
+    extractor: pdf
+    summarize: false
+    extract: [Procedure, Setting]    # from manuals only procedures and settings
+    pages: {}
+    hint: "A manual: extract only procedures and settings, with their page. Do not summarize."
+
+concepts:
+  Product:
+    folder: products
+    key: "{name}"
+    title: "{name}"
+    summary: "Software products and modules supported."
+    description: "A software product or module that is supported (e.g. billing-app)."
+    attributes: [name, vendor, description, current_version, support_status]
+    description_from: [description]
+    identity_rule: "Different product names are different products; an alias of a product is the same product."
+  Version:
+    folder: versions
+    key: "{product}/{version}"
+    title: "{product} {version}"
+    summary: "Releases of each product: date, changes, known issues."
+    description: "A release of a product: date, changes, known issues."
+    attributes: [release_date, changes, known_issues, support_end]
+    events: [release, hotfix]
+    description_from: [changes]
+    identity_rule: "Different version numbers are different versions."
+  Ticket:
+    folder: tickets
+    key: "{number}"
+    title: "Ticket {number}"
+    summary: "Support requests, with product, version and the actions taken."
+    description: "A support request with its number, the affected product and version, and the actions taken."
+    attributes: [number, product, version, description, priority, status, opened, closed]
+    events: [action, reply]
+    description_from: [description]
+    identity_rule: "Different ticket numbers are different tickets."
+  Bug:
+    folder: bugs
+    key: "{product}/{symptom}"
+    entity_proposals: true
+    title: "{symptom} ({product})"
+    summary: "Defects, named by what is seen: occurrences, causes, attempts, current fix."
+    description: >-
+      A defect named by its observable SYMPTOM (e.g. export-hangs-on-large-files). Each report is an 'occurrence' event
+      (with ticket and version); causes are 'cause' events; attempts are 'attempt' events with their outcome.
+    attributes: [description, affected_versions, workaround, fixed_in, status]
+    events: [occurrence, cause, attempt]
+    count_events: [occurrence]
+    description_from: [description]
+    identity_rule: "The same observable symptom is the same bug even with different causes; related symptoms are similar."
+  Setting:
+    folder: settings
+    key: "{product}/{name}"
+    title: "{name} ({product})"
+    summary: "Configuration settings: meaning, default, recommended value, effects."
+    description: "A configuration setting: meaning, default, recommended value and its effects."
+    attributes: [description, default, recommended, effects]
+    events: [change]
+    description_from: [description]
+  Procedure:
+    folder: procedures
+    key: "{product}/{title}"
+    entity_proposals: true
+    title: "{title} ({product})"
+    summary: "How to do things: upgrades, restores, other operating procedures."
+    description: "An operating procedure (e.g. upgrade, restore a backup, rotate a certificate)."
+    attributes: [title, steps, prerequisites, tools, warnings]
+    review_priority: high
+    description_from: [title]
+    identity_rule: "The same operation on the same product is the same procedure even if its title is worded differently."
+
+aliases: {}
+
+policy:
+  stale_after_days: 365
+  minimize_personal_data: true
+  quarantine_rules: default
+
+backup:
+  max_age_days: 7

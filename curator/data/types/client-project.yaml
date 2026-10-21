@@ -1,0 +1,223 @@
+# Type configuration: a client engagement: study a company (what it is, how it is organized, its processes, its money,
+# its rules, who said what) and follow the project (goal, status, decisions, issues, next steps).
+# DRAFT: not yet exercised on real data; measure it with `curator eval` before relying on it.
+# Used by `curator init --type client-project`. The folders of raw/ say HOW a source must be read (each folder has a
+# reading hint for the LLM); inside a folder the format is recognized by the extension.
+#
+# People are identified by NAME, as written in the sources, so that "who said what and when" can be answered.
+# Personal data: if you may not keep names, identify people by role instead — change the key of Person to
+# "{role}" and its description to "a role in the company (e.g. production-manager)…".
+schema_version: 1
+status: draft
+
+instance:
+  name: ""
+  type: client-project
+  language: en          # language of the content (facts): `curator init --language` changes it
+
+llm:
+  backend: claude-code
+  model: ""
+  timeout_seconds: 300
+  max_tokens_per_run: 400000
+  cache: true
+
+chunking:
+  max_tokens: 3000
+  overlap_tokens: 150
+  table_rows_per_chunk: 60
+
+source_date: [content, filename, mtime]
+
+ignore:
+  - "**/~$*"
+  - "**/*.{zip,exe,dll,bin}"
+  - "**/Thumbs.db"
+  - "**/.DS_Store"
+
+sources:
+  - match: "notes/**/*.{txt,md}"
+    extractor: note
+    hint: "Notes written by the owner of this SSOT (the consultant): observations and first-hand knowledge, attributed to the owner."
+  - match: "notes/**/*"
+    extractor: auto
+    hint: "Notes collected by the owner of this SSOT."
+  - match: "interviews/**/*"
+    extractor: auto
+    hint: >-
+      Transcripts or notes of interviews with people of the company. Attribute every statement to the person who said
+      it (a 'statement' event of that Person, with the topic in `related`). What a person says about the company is
+      their statement, not an established fact: write it as "<name> says that …", and record facts about the
+      company only when the speaker states them as facts (numbers, how a process works, who does what).
+  - match: "conversations/**/*"
+    extractor: auto
+    hint: >-
+      Mail and chat with the client or the team: who said what and when, requests, commitments, decisions, problems
+      raised, next steps agreed. Opinions stay attributed to who wrote them.
+  - match: "company-docs/**/*"
+    extractor: auto
+    hint: >-
+      Official documents of the company (organization charts, procedures, policies, presentations, regulations):
+      authoritative about structure, processes, systems and rules. Do not summarize: extract what they state.
+  - match: "finance/**/*"
+    extractor: auto
+    extract: [FinancialItem, Company, Unit, Process]
+    hint: >-
+      Financial documents (P&L, budgets, cost reports, balance sheets): one fact per line item, with amount, currency
+      or unit and period exactly as written. Say where money comes from and where it goes when the document says it.
+  - match: "project/**/*"
+    extractor: auto
+    hint: >-
+      Project documents (proposals, statements of work, plans, minutes, status reports): goal, scope, phases, status,
+      decisions, requirements, issues and actions with owner and due date.
+
+concepts:
+  Company:
+    folder: company
+    key: "{name}"
+    title: "{name}"
+    summary: "The company studied and the other organizations involved: what they do, how big, for whom."
+    description: >-
+      The company being studied (or another organization involved: a supplier, a customer of theirs): industry, what it
+      does, products and services, customers and markets, size, sites, business model.
+    attributes: [industry, activity, products_services, customers_markets, size, sites, business_model]
+    events: [change]
+    description_from: [activity]
+    identity_rule: "Different legal names are different companies; a brand or short name of a company is the same company."
+  Unit:
+    folder: units
+    key: "{company}/{name}"
+    title: "{name} ({company})"
+    summary: "Departments, functions and teams: what they do and who leads them."
+    description: "A department, function or team of a company: what it does, who leads it (a Person or a role), how many people, which other units it works with."
+    attributes: [purpose, head, headcount, responsibilities, interfaces]
+    events: [change]
+    description_from: [purpose]
+    identity_rule: "The same function under two names (e.g. 'Production' and 'Manufacturing') is the same unit."
+  Process:
+    folder: processes
+    key: "{company}/{name}"
+    entity_proposals: true           # processes are named freely: the same process can get two names
+    title: "{name} ({company})"
+    summary: "How the company works: flows of work, owners, systems, KPIs, maturity."
+    description: >-
+      How the company does something (order to delivery, production planning, purchasing, quality control…): purpose,
+      owner, inputs and outputs, steps, systems used, KPIs, maturity (e.g. state of a lean or other improvement
+      program). Problems seen in the process are events.
+    attributes: [purpose, owner, inputs, outputs, steps, systems, kpis, maturity]
+    events: [problem_observed, change]
+    description_from: [purpose]
+    identity_rule: "The same flow of work is the same process even if people call it differently; a part of a process is a separate, linked process."
+  System:
+    folder: systems
+    key: "{company}/{name}"
+    title: "{name} ({company})"
+    summary: "Tools and systems in use (ERP, MES, spreadsheets…): purpose, users, limits."
+    description: "A tool or system the company uses (ERP, MES, CRM, spreadsheets, machines…): what it is for, who uses it, integrations, limits."
+    attributes: [purpose, users, integrations, limits, vendor_version]
+    events: [change]
+    description_from: [purpose]
+  FinancialItem:
+    folder: finance
+    key: "{company}/{period}/{item}"
+    title: "{item} {period} ({company})"
+    summary: "Lines of the P&L, budgets and cost reports, by period."
+    description: >-
+      A line of the P&L or of a budget or cost report: revenue, cost or margin item with amount, currency, period,
+      trend, and where the money comes from or goes when the source says it.
+    attributes: [kind, amount, currency, source_or_destination, trend, notes]
+    description_from: [kind]
+    identity_rule: "The same item for a different period is a different concept (the key carries the period)."
+  Rule:
+    folder: rules
+    key: "{name}"
+    entity_proposals: true
+    title: "{name}"
+    summary: "Laws, policies, contracts and unwritten rules to follow."
+    description: >-
+      A rule to follow: a law or regulation, an internal policy, a contractual constraint, a mandatory procedure, an
+      unwritten rule people state ("we never ship without…"): what it says, what it applies to, who imposes it.
+    attributes: [statement, applies_to, imposed_by, kind]
+    events: [change]
+    description_from: [statement]
+    identity_rule: "The same obligation is the same rule even if worded differently; a rule that details another is similar."
+  Person:
+    folder: people
+    key: "{name}"
+    title: "{name}"
+    summary: "People met or mentioned: role, unit, concerns, and what they said and when."
+    description: >-
+      A person met or mentioned in the project (of the company, of a supplier, of the team), identified by name as
+      written in the sources: role, unit, responsibilities, what they care about. What they said is a 'statement' event
+      (date, source, topic in related).
+    attributes: [role, unit, organization, responsibilities, concerns]
+    events: [statement]
+    description_from: [role]
+    identity_rule: "The same name with the same role or organization is the same person; a nickname or a first name alone is an alias, when the context makes it clear."
+  Project:
+    folder: projects
+    key: "{code}"
+    title: "Project {code}"
+    summary: "The engagement: goal, scope, phase, status, milestones."
+    description: "The engagement: goal, scope, phase, status, success metrics, budget; status updates and milestones are events."
+    attributes: [goal, scope, phase, status, success_metrics, budget]
+    events: [status_update, milestone]
+    description_from: [goal]
+    identity_rule: "Different codes are different projects."
+  Requirement:
+    folder: requirements
+    key: "{project}/{name}"
+    entity_proposals: true
+    title: "{name} ({project})"
+    summary: "What the client needs, with priority, acceptance criteria and status."
+    description: "A need of the client, named by WHAT is needed (not how it is built): priority, acceptance criteria, status (proposed, agreed, done, dropped)."
+    attributes: [description, priority, acceptance_criteria, status]
+    events: [change]
+    description_from: [description]
+    identity_rule: "The same need is the same requirement even if worded differently; a need that refines another is similar."
+  Decision:
+    folder: decisions
+    key: "{project}/{name}"
+    entity_proposals: true
+    title: "{name} ({project})"
+    summary: "Decisions taken in the project: what, why, by whom, when."
+    description: "A decision taken in the project: what was decided, why, the alternatives, who decided, when; a later decision on the same question is a revision."
+    attributes: [decision, rationale, alternatives, decided_by, status]
+    events: [revision]
+    description_from: [decision]
+    review_priority: high
+    identity_rule: "The same question decided is the same decision."
+  Issue:
+    folder: issues
+    key: "{project}/{symptom}"
+    entity_proposals: true
+    title: "{symptom} ({project})"
+    summary: "Problems met in the project or in the company, named by their symptom."
+    description: >-
+      A problem met in the project or in the company, named by its observable SYMPTOM (e.g. late-deliveries,
+      data-entered-twice): each report is an 'occurrence', causes and attempts are events, 'resolution' is the
+      solution in use now.
+    attributes: [description, impact, resolution, status]
+    events: [occurrence, cause, attempt]
+    count_events: [occurrence]
+    description_from: [description]
+    identity_rule: "The same observable symptom is the same issue even with different causes; related symptoms are similar."
+  Action:
+    folder: actions
+    key: "{project}/{name}"
+    title: "{name} ({project})"
+    summary: "Next steps: what, who, by when, status."
+    description: "A next step: what, who (a Person or a role), due date, status (open, done, dropped)."
+    attributes: [description, owner, due, status]
+    events: [update]
+    description_from: [description]
+
+aliases: {}
+
+policy:
+  stale_after_days: 180
+  minimize_personal_data: false     # people are identified by name in this type
+  quarantine_rules: default
+
+backup:
+  max_age_days: 7

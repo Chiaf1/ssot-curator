@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssot-curator"
+dynamic = ["version"]
+description = "Curatore di una SSOT in formato OKF: raccoglie fonti grezze, estrae fatti citati, genera concetti Markdown."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "LICENSE-docs"]
+requires-python = ">=3.12"
+dependencies = [
+    "pypdf>=5",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "PyYAML>=6",
+    "jsonschema>=4.22",
+    "click>=8.1",
+    "Pillow>=10",        # images of scanned PDF pages (MIT-CMU)
+    "olefile>=0.47",     # Outlook .msg (BSD)
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "anthropic>=1.0"]
+prep = ["pypdfium2>=4"]      # only tools/prepare_raw.py: renders scanned PDF pages (Apache-2.0 / BSD-3)
+api = ["anthropic>=1.0"]      # anthropic-api backend
+
+[project.scripts]
+curator = "curator.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["curator*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "curator.__version__"}
+
+[tool.setuptools.package-data]
+curator = ["data/prompts/*.md", "data/types/*.yaml", "data/templates/*", "data/templates/**/*",
+           "data/demo/llm/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

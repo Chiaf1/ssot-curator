@@ -1,0 +1,24 @@
+# Real data never enter this repository: instances and samples live outside it, or here, ignored
+instances/
+samples/
+sample/
+**/raw/
+**/state/
+**/curated/
+eval/results/
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+secrets*
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/

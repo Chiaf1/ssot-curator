@@ -9,9 +9,12 @@ examples/expected/ of the repository.
 """
 from __future__ import annotations
 
+import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
+FILE_DATE = datetime(2026, 2, 15, 12, tzinfo=timezone.utc).timestamp()   # noon UTC: the same day everywhere
 LLM_FIXTURES = Path(__file__).parent / "data" / "demo" / "llm"
 
 
@@ -134,6 +137,8 @@ def build(raw: Path, extended: bool = False) -> list[str]:
     out = [*files, "service-reports/report BL2.docx"]
     if extended:
         out += build_extended(raw)
+    for rel in out:            # a fixed date: a source without one is dated by its file, not by the day of the build
+        os.utime(raw / rel, (FILE_DATE, FILE_DATE))
     return sorted(out)
 
 

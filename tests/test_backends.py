@@ -63,6 +63,8 @@ def test_anthropic_api_structured_output_usage_and_cost():
     assert kw["system"][0]["cache_control"] == {"type": "ephemeral"}       # the system prompt is cached
     assert kw["fallbacks"] == "default" and kw["betas"] == ["server-side-fallback-2026-07-01"]
     assert res.input_tokens == 5000 and res.output_tokens == 200
+    # against --max-tokens the 4000 tokens read from the prompt cache count at a tenth
+    assert res.cache_read_tokens == 4000 and res.budget_tokens == 1000 + 400 + 200
     # $4 / $20 per MTok, cache reads at 10% of the input price
     assert res.cost_usd == pytest.approx((1000 * 4 + 4000 * 0.4 + 200 * 20) / 1e6)
     # without server-side fallbacks, with an effort level
@@ -158,3 +160,21 @@ def test_config_backends_cost_estimate_and_doctor(instance):
     assert estimated_cost(cfg, 1_000_000) == pytest.approx(0.75 * 2 + 0.25 * 10)
     configure(instance.root, llm={"backend": "claude-code"})
     assert estimated_cost(instance.config(), 1_000_000) is None              # subscription: no $ estimate
+
+
+def test_every_schema_sent_to_the_llm_is_a_valid_schema(instance):
+    # validate_output does not check the schema at every answer: the builders are checked here
+    import jsonschema
+    from curator import proposals, quotecheck, reconcile
+    from curator.config import load_config
+    from curator.interpret import build_schema
+    from curator.llm.base import validate_output
+    cfg = load_config(instance.root)
+    types = list(cfg.concepts.values())
+    for schema in (build_schema(types, list(cfg.concepts), ["p1", "p2"]), build_schema(types[:1], [types[0].name], ["p1"]),
+                   reconcile.build_schema(["u1", "u2"]), quotecheck.schema(["f1"]), proposals.entity_schema(["u1", "u2"])):
+        jsonschema.validators.validator_for(schema).check_schema(schema)
+    schema = build_schema(types, list(cfg.concepts), ["p1"])
+    validate_output({"facts": [], "unclassified": [], "suspicious_instructions": []}, schema)
+    with pytest.raises(LLMError, match="does not match the schema"):
+        validate_output({"facts": [], "unclassified": []}, schema)

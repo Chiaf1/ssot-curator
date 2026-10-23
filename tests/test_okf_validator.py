@@ -1,13 +1,17 @@
 """The validator must notice the violations of spec §16."""
 from curator import facts as factsdb
-from curator.pipeline import Curator
+from curator.pipeline import Curator, read_tree
 from curator.scanner import read_manifest
 from curator.validator import Tree, validate
 
 
 def _errors(inst):
     con = factsdb.connect(inst.facts_db)
-    return validate(Tree(inst.ssot, inst.curated, inst.raw, con, read_manifest(inst)))
+    on_disk = validate(Tree(inst.ssot, inst.curated, inst.raw, con, read_manifest(inst)))
+    # a run validates the pages it has just rendered, in memory: the same checks, the same errors
+    in_memory = validate(Tree(inst.ssot, inst.curated, inst.raw, con, read_manifest(inst), pages=read_tree(inst.ssot)))
+    assert in_memory == on_disk
+    return on_disk
 
 
 def _edit(path, old, new):
@@ -48,3 +52,19 @@ def test_detects_log_order(instance):
     (instance.ssot / "log.md").write_text("# Log\n\n## 2025-01-01\n\n- a\n\n## 2026-01-01\n\n- b\n",
                                           encoding="utf-8")
     assert any("newest first" in e for e in _errors(instance))
+
+
+def test_search_index_from_memory_equals_index_from_disk(instance, tmp_path):
+    import sqlite3
+    from curator.search import build_index
+    Curator(instance).run()
+
+    def rows(db):
+        con = sqlite3.connect(db)
+        out = (con.execute("SELECT path, kind, type, location, title, body FROM docs ORDER BY rowid").fetchall(),
+               con.execute("SELECT target, source FROM backlinks ORDER BY rowid").fetchall())
+        con.close()
+        return out
+    build_index(tmp_path / "disk.db", instance.ssot, instance.curated)
+    build_index(tmp_path / "memory.db", instance.ssot, instance.curated, read_tree(instance.ssot))
+    assert rows(tmp_path / "memory.db") == rows(tmp_path / "disk.db") and rows(tmp_path / "disk.db")[0]

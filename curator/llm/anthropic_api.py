@@ -86,4 +86,4 @@ class AnthropicApiBackend(LLMBackend):
                          input_tokens=usage["input_tokens"] + usage["cache_creation_input_tokens"]
                          + usage["cache_read_input_tokens"],
                          output_tokens=usage["output_tokens"], cost_usd=cost(msg.model, usage, self.prices),
-                         extra={"usage": usage})
+                         extra={"usage": usage}, cache_read_tokens=usage["cache_read_input_tokens"])

@@ -11,7 +11,8 @@ from curator.curated import ANCHOR_RE, read_front_matter
 LINK = re.compile(r"\]\((/[^)#]+\.md)")
 
 
-def build_index(db_path: Path, ssot: Path, curated: Path) -> int:
+def build_index(db_path: Path, ssot: Path, curated: Path, pages: dict[str, str] | None = None) -> int:
+    """`pages`: the files of ssot/ already in memory (just rendered), so that they are not read again from disk."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = db_path.with_suffix(".tmp")
     tmp.unlink(missing_ok=True)
@@ -20,11 +21,11 @@ def build_index(db_path: Path, ssot: Path, curated: Path) -> int:
                 "location UNINDEXED, title, body, tokenize='unicode61 remove_diacritics 2')")
     con.execute("CREATE TABLE backlinks(target TEXT, source TEXT)")
     n = 0
-    for p in sorted(ssot.rglob("*.md")) if ssot.exists() else []:
-        rel = p.relative_to(ssot).as_posix()
-        if rel.startswith(".git/"):
-            continue
-        text = p.read_text(encoding="utf-8")
+    if pages is None:
+        pages = {p.relative_to(ssot).as_posix(): p.read_text(encoding="utf-8")
+                 for p in (ssot.rglob("*.md") if ssot.exists() else []) if ".git" not in p.relative_to(ssot).parts}
+    for rel in sorted(r for r in pages if r.endswith(".md")):
+        text = pages[rel]
         fm = read_front_matter(text) or {}
         con.execute("INSERT INTO docs VALUES (?,?,?,?,?,?)",
                     (f"ssot/{rel}", "concept", fm.get("type", ""), "", fm.get("title", rel), text))

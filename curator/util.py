@@ -1,4 +1,4 @@
-"""Shared helpers: hashing, slugs, time, text normalization."""
+"""Shared helpers: hashing, slugs, time, text normalization, YAML."""
 from __future__ import annotations
 
 import hashlib
@@ -6,6 +6,16 @@ import os
 import re
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
+
+import yaml
+
+# libyaml when the installed PyYAML has it: the same data as the pure-Python loader, about 7 times faster
+_YAML_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
+def load_yaml(text: str):
+    """yaml.safe_load, faster: the front matter of every page is read at every run."""
+    return yaml.load(text, Loader=_YAML_LOADER)
 
 
 def sha256_bytes(data: bytes) -> str:

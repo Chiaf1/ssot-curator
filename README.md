@@ -31,7 +31,7 @@ and the LLM backend, and creates your first instance. Inside the instance, anoth
 over: it runs the curator with your confirmation and walks you through what needs a decision. The rest of
 this README is the same information, written down.
 
-> **Status: 0.4.3.** Three SSOT types, all **drafts**: `plant-support` (technical support of an industrial
+> **Status: 0.4.4.** Three SSOT types, all **drafts**: `plant-support` (technical support of an industrial
 > plant: axes, network devices, alarms, procedures, problems, service tickets) is the generic form of a type
 > used for months on real data; `client-project` (study a client company and follow an engagement) and
 > `software-support` have not been exercised on real data yet. Check the first results of any type and write

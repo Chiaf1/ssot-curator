@@ -458,7 +458,8 @@ class Curator:
         bundle = render_bundle(con, cfg)
         write_tree(staging / "ssot", bundle)
         (staging / "state" / "manifest.jsonl").write_text(manifest_text, encoding="utf-8", newline="\n")
-        rep.validation_errors = validate(Tree(staging / "ssot", staging / "curated", inst.raw, con, new_manifest))
+        rep.validation_errors = validate(Tree(staging / "ssot", staging / "curated", inst.raw, con, new_manifest,
+                                             pages=bundle))
 
         rep.changed = (db_changed or bundle != read_tree(inst.ssot)
                        or read_tree(staging / "curated") != read_tree(inst.curated)
@@ -628,7 +629,7 @@ class Curator:
                 continue
             self._timed(rep, task, t, res)
             rep.llm_calls += 1
-            rep.tokens_used += res.total_tokens
+            rep.tokens_used += res.budget_tokens
             rep.cost_usd += res.cost_usd
             rep.model = res.model
             try:
@@ -814,7 +815,7 @@ class Curator:
         inst.manifest.write_text(manifest_text, encoding="utf-8", newline="\n")
         (inst.state / "quarantine.md").write_text(quarantine_md, encoding="utf-8", newline="\n")
         (inst.state / "quarantena.md").unlink(missing_ok=True)      # name used before the English rename
-        build_index(inst.search_db, inst.ssot, inst.curated)
+        build_index(inst.search_db, inst.ssot, inst.curated, bundle)
 
     def _merge_cache(self, staging: Path):
         src = staging / "llm_cache"
@@ -877,12 +878,12 @@ class Curator:
             staging = inst.staging / ("render-" + now().strftime("%Y%m%dT%H%M%S"))
             write_tree(staging / "ssot", bundle)
             errors = validate(Tree(staging / "ssot", inst.curated, inst.raw, con,
-                                   {r: v for r, v in read_manifest(inst).items()}))
+                                   {r: v for r, v in read_manifest(inst).items()}, pages=bundle))
             con.close()
             commit = ""
             if not errors:
                 sync_tree(inst.ssot, bundle)
-                build_index(inst.search_db, inst.ssot, inst.curated)
+                build_index(inst.search_db, inst.ssot, inst.curated, bundle)
                 commit = git_commit(inst.root, "curator: OKF regeneration")
                 shutil.rmtree(staging, ignore_errors=True)
             return errors, commit

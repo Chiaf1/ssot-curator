@@ -19,6 +19,7 @@ import yaml
 from curator.config import Config, ConceptType
 from curator.derive import conflict_id
 from curator.resources import resource
+from curator.util import load_yaml
 
 OKF_VERSION = "0.2"
 SPECIAL = {"index.md", "log.md", "conflicts.md", "CLAUDE.md"}
@@ -287,7 +288,7 @@ class Renderer:
                 continue
             text = self.concept_file(uid)
             files[f"{self.cur_path[uid]}.md"] = text
-            fm = yaml.safe_load(text.split("---\n", 2)[1])
+            fm = load_yaml(text.split("---\n", 2)[1])
             info[uid] = (fm["description"], fm.get("occurrences", {}))
         # merged or renamed concepts stay as deprecated stubs with moved_to (spec §9)
         for uid, c in self.concepts.items():

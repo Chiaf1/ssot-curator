@@ -3,6 +3,22 @@
 All notable changes to `ssot-curator`. Versions follow [semantic versioning](https://semver.org/):
 a change of the instance formats comes with `curator migrate`.
 
+## 0.4.4
+
+Faster local work, same SSOT: the pages, the checks and the answers accepted are the same as in 0.4.3.
+
+- **The SSOT is validated and indexed from memory.** A run validated its pages by reading them back from
+  the staging folder, rewritten in full at every run; on Windows the first read of a file just written waits
+  for the antivirus (about 15 ms per page), so every run paid it for every page. Now the pages just rendered
+  are validated and indexed in memory; as before, only the pages that changed are written to `ssot/`. Synthetic
+  benchmark, 200 documents, Windows: first run 169 → 48 s, a run with 1% more documents 67 → 19 s.
+- **Front matter read with libyaml** when PyYAML has it (same data, about 7 times faster).
+- **LLM answers validated without re-checking their schema** at every answer (about 70% of that time);
+  a test checks every schema the curator builds instead.
+- **`anthropic-api`: tokens read from the prompt cache count a tenth against `--max-tokens`**, as in the
+  price, so a run no longer stops early (`tokens` in the summary of these runs is that weighted count; the
+  per-call lines keep the real input tokens).
+
 ## 0.4.3
 
 - **The time of every LLM call is measured** (first item of `docs/performance.md`). The summary of `run`,

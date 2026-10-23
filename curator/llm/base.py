@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 import jsonschema
 
+CACHE_READ_WEIGHT = 0.10       # price of a token read from the prompt cache, as a share of an input token
 
 class LLMError(Exception):
     pass
@@ -18,10 +19,16 @@ class LLMResult:
     output_tokens: int = 0
     cost_usd: float = 0.0
     extra: dict = field(default_factory=dict)
+    cache_read_tokens: int = 0     # part of input_tokens read from the prompt cache (anthropic-api)
 
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
+
+    @property
+    def budget_tokens(self) -> int:
+        """What the call counts against --max-tokens: a token read from the prompt cache costs a tenth."""
+        return self.total_tokens - round(self.cache_read_tokens * (1 - CACHE_READ_WEIGHT))
 
 
 class LLMBackend:
@@ -64,7 +71,9 @@ def timing_lines(by_task: dict) -> list[str]:
 
 
 def validate_output(data, schema: dict) -> None:
-    try:
-        jsonschema.validate(data, schema)
-    except jsonschema.ValidationError as e:
-        raise LLMError(f"response does not match the schema: {e.message}") from e
+    # the schemas are built by the curator (their validity is a test): checking the schema itself at every
+    # answer, as jsonschema.validate does, took about 70% of the time. Same errors as jsonschema.validate
+    validator = jsonschema.validators.validator_for(schema)(schema)
+    error = jsonschema.exceptions.best_match(validator.iter_errors(data))
+    if error is not None:
+        raise LLMError(f"response does not match the schema: {error.message}")

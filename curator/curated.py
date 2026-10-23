@@ -9,6 +9,7 @@ from datetime import date
 import yaml
 
 from curator.extractors import EXTRACTOR_VERSION, ExtractedDoc
+from curator.util import load_yaml
 
 ANCHOR_RE = re.compile(r'<a id="([^"]+)"></a>')
 ROOT_FOLDER = "misc"          # curated folder for files placed directly in raw/
@@ -74,7 +75,7 @@ def read_front_matter(text: str) -> dict | None:
     if end < 0:
         return None
     try:
-        data = yaml.safe_load(text[4:end])
+        data = load_yaml(text[4:end])
     except yaml.YAMLError:
         return None
     return data if isinstance(data, dict) else None

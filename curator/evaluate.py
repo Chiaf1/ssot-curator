@@ -248,7 +248,7 @@ class Evaluator:
                 continue
             timed(t, res)
             rep.llm_calls += 1
-            rep.tokens_used += res.total_tokens
+            rep.tokens_used += res.budget_tokens
             if res.model not in rep.models_used:
                 rep.models_used.append(res.model)
             try:

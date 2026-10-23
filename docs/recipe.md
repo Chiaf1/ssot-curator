@@ -95,7 +95,7 @@ Every command finds the instance from `--instance` or the current folder, and su
 
 ```yaml
 schema_version: 1
-curator_version: "0.4.3"          # written by init, updated by migrate
+curator_version: "0.4.4"          # written by init, updated by migrate
 instance: {name: my-ssot, type: client-project, language: en, owner: owner}
 llm: {backend: claude-code, model: "", timeout_seconds: 300, max_tokens_per_run: 400000, cache: true}
 chunking: {max_tokens: 3000, overlap_tokens: 150, table_rows_per_chunk: 60}
@@ -161,7 +161,8 @@ claude -p --output-format json --json-schema <schema> --permission-mode dontAsk 
 `get_final_message()`; `llm.model` (default `claude-opus-5-5`), `llm.effort`, `llm.max_output_tokens`;
 server-side fallbacks on refusals (`llm.fallbacks`, beta `server-side-fallback-2026-07-01`); `refusal` and
 `max_tokens` stop reasons are errors for the chunk. Usage (input, output, cache write and read) and cost
-from the response, with the price list of the current models or `llm.prices`. Credentials from the
+from the response, with the price list of the current models or `llm.prices`; against the token limit a token
+read from the prompt cache counts a tenth, as in the price. Credentials from the
 environment (resolved by the SDK), never from files.
 
 **`openai-compatible` backend** (`llm/openai_compat.py`, standard library HTTP): `POST {base_url}/chat/completions`

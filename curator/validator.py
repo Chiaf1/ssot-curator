@@ -24,6 +24,20 @@ class Tree:
     raw: Path
     db: sqlite3.Connection
     manifest: dict          # raw_path -> record
+    # the files of ssot/ already in memory (the tree just rendered): read from here, not from disk. On Windows
+    # the first read of a file just written waits for the antivirus, about 15 ms per page
+    pages: dict[str, str] | None = None
+
+
+def _pages(tree: Tree) -> dict[str, str]:
+    if tree.pages is not None:
+        return {rel: tree.pages[rel] for rel in sorted(tree.pages) if rel.endswith(".md")}
+    out = {p.relative_to(tree.ssot).as_posix(): p for p in tree.ssot.rglob("*.md")}
+    return {rel: out[rel].read_text(encoding="utf-8") for rel in sorted(out) if not rel.startswith(".git/")}
+
+
+def _page_exists(tree: Tree, rel: str) -> bool:
+    return rel in tree.pages if tree.pages is not None else (tree.ssot / rel).exists()
 
 
 def validate(tree: Tree) -> list[str]:
@@ -37,19 +51,16 @@ def validate(tree: Tree) -> list[str]:
 
 def _check_okf(tree: Tree) -> list[str]:
     errs = []
-    root_index = tree.ssot / "index.md"
-    if not root_index.exists():
+    pages = _pages(tree)
+    if "index.md" not in pages:
         return ["missing ssot/index.md"]
-    fm = read_front_matter(root_index.read_text(encoding="utf-8"))
+    fm = read_front_matter(pages["index.md"])
     if not fm or "okf_version" not in fm:
         errs.append("ssot/index.md: okf_version missing from the front matter")
     uids: dict[str, str] = {}
-    for p in sorted(tree.ssot.rglob("*.md")):
-        rel = p.relative_to(tree.ssot).as_posix()
-        if rel.startswith(".git/"):
-            continue
-        text = p.read_text(encoding="utf-8")
-        name = p.name
+    anchors: dict[str, set[str]] = {}       # a source cited by many concepts is read once
+    for rel, text in pages.items():
+        name = posixpath.basename(rel)
         if name == "index.md":
             if rel != "index.md" and text.startswith("---\n"):
                 errs.append(f"{rel}: a non-root index.md must not have a front matter")
@@ -82,12 +93,16 @@ def _check_okf(tree: Tree) -> list[str]:
             res = s.get("resource", "")
             target, _, anchor = res.partition("#")
             f = _resolve(tree, rel, target)
-            if f is None or not f.exists():
+            page = f.relative_to(tree.ssot).as_posix() if f is not None and f.is_relative_to(tree.ssot) else None
+            if f is None or not (_page_exists(tree, page) if page is not None else f.exists()):
                 errs.append(f"{rel}: sources[{s.get('id')}] points to a missing file: {res}")
-            elif anchor and anchor not in anchors_in(f.read_text(encoding="utf-8")):
-                errs.append(f"{rel}: sources[{s.get('id')}] missing anchor: #{anchor}")
+            elif anchor:
+                if str(f) not in anchors:
+                    anchors[str(f)] = anchors_in(pages[page] if page is not None else f.read_text(encoding="utf-8"))
+                if anchor not in anchors[str(f)]:
+                    errs.append(f"{rel}: sources[{s.get('id')}] missing anchor: #{anchor}")
         if fm.get("moved_to"):
-            if not (tree.ssot / fm["moved_to"].lstrip("/")).exists():
+            if not _page_exists(tree, fm["moved_to"].lstrip("/")):
                 errs.append(f"{rel}: moved_to points to a missing concept")
     return errs
 
@@ -129,9 +144,9 @@ def _check_db(tree: Tree) -> list[str]:
             errs.append(f"quarantined source {r['doc_id']} has {n} facts in the store")
         for f in tree.curated.rglob(f"{r['doc_id']}.md") if tree.curated.exists() else []:
             errs.append(f"quarantined source present in curated/: {f.name}")
-        for f in tree.ssot.rglob("*.md"):
-            if r["doc_id"] in f.read_text(encoding="utf-8"):
-                errs.append(f"quarantined source cited in ssot/{f.relative_to(tree.ssot).as_posix()}")
+        for rel, text in _pages(tree).items():
+            if r["doc_id"] in text:
+                errs.append(f"quarantined source cited in ssot/{rel}")
     bad = db.execute("SELECT fact_id FROM facts WHERE status IN ('pending','verified') "
                      "AND (quote IS NULL OR quote = '' OR location = '')").fetchall()
     errs += [f"fact {r['fact_id']} without a verified quote" for r in bad]
@@ -141,7 +156,7 @@ def _check_db(tree: Tree) -> list[str]:
     for c in db.execute("SELECT uid, path, status, moved_to FROM concepts"):
         n = db.execute("SELECT COUNT(*) FROM facts WHERE concept_uid = ? AND status != 'rejected'",
                        (c["uid"],)).fetchone()[0]
-        if n and not (tree.ssot / f"{c['path']}.md").exists():
+        if n and not _page_exists(tree, f"{c['path']}.md"):
             errs.append(f"concept {c['path']} has facts but no file in ssot/")
     return errs
 

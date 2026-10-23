@@ -5,10 +5,12 @@ one after the other, and every call costs about 15,000 tokens. With a few dozen 
 matter; with thousands, the first load takes many hours and a large share of a subscription's quota.
 
 This page states the limits with measured numbers, explains what you can do today, and lists the
-improvements under evaluation. **Only the first improvement is implemented** (in 0.4.3: the time of every
-call in the run report); the table says when another one is, and in which version.
+improvements under evaluation. **Three are implemented**: the time of every call in the run report (0.4.3),
+faster validation of the answers and the right weight of cached prompt tokens (0.4.4); the table says
+when another one is, and in which version.
 
-Measured on version 0.4.1 (0.4.2 and 0.4.3 read and call the LLM in the same way). Last updated: 2026-10-23.
+The LLM numbers were measured on version 0.4.1 (later versions read and call the LLM in the same way); the
+local times are those of 0.4.1, with the 0.4.4 gains in [Windows](#on-windows). Last updated: 2026-10-23.
 
 - [In short](#in-short)
 - [Where the time and the tokens go](#where-the-time-and-the-tokens-go)
@@ -29,7 +31,8 @@ Measured on version 0.4.1 (0.4.2 and 0.4.3 read and call the LLM in the same way
   On a subscription, **the quota is probably the real limit**, before the time.
 - **The local work grows linearly** (about 0.2 s per call) and has no quadratic bottleneck up to 2,000
   documents. But every run regenerates and re-validates the whole SSOT: **about 1.5 minutes per run at 2,000
-  documents**, even when nothing changed.
+  documents**, even when nothing changed (measured on 0.4.1; 0.4.4 made the validation of the answers about
+  three times faster and, on Windows, stopped re-reading every page from disk).
 - **After the first load it is cheap**: a document already read is never sent again (LLM cache). Adding a
   few documents costs only those documents, plus the fixed local time above.
 
@@ -75,6 +78,22 @@ At 2,000 documents, of the first run:
 
 The last three are paid **at every run and at every decision**, however small the change.
 
+### On Windows
+
+On Windows the first read of a file just written waits for the antivirus, about 15 ms per page. Up to
+0.4.3 a run rewrote the whole SSOT in a staging folder and read it back to validate it, so every run paid
+this for every page. Since 0.4.4 the pages are validated and indexed from memory: a page pays it once, when
+it is new or changed. The same synthetic benchmark, 200 documents, on a Windows laptop:
+
+| Version | First run | Run with nothing new | Run with +1% documents |
+|---|---:|---:|---:|
+| 0.4.3 | 169 s | 60 s | 67 s |
+| 0.4.4 | 48 s | 62 s ¹ | 19 s |
+
+¹ The run right after the first one is the first to read the 3,400 pages just written, and pays their
+antivirus check once; the run after it does not. Same pages, byte for byte: the 0.4.4 code renders the
+store of the 0.4.3 run into the same files.
+
 ## Known limits
 
 1. **Sequential calls.** One call at a time; each starts a new Claude Code process. Wall time is the sum of
@@ -84,16 +103,19 @@ The last three are paid **at every run and at every decision**, however small th
 3. **Verbose answers.** The model writes about twice what it reads; a large part is repeated structure.
 4. **Whole SSOT rebuilt at every run and decision.** Pages, validation and search index are regenerated from
    scratch: about 1.5 minutes at 2,000 documents, also for one `curator approve`.
-5. **Answer validation is slow** (about 0.1 s per call): small next to the LLM, but more than half of the
-   local time.
+5. **Answer validation was slow** (about 0.1 s per call), more than half of the local time. **Solved in
+   0.4.4**: about three times faster (the schema, built by the curator, is no longer re-checked at every
+   answer).
 6. **Reconciliation re-sends a concept's whole history.** When a concept gets a new fact, all the groups of
    facts of that concept are judged again, with their texts and quotes. An attribute that changed many
    times over the years is re-sent in full at every change: the cost grows faster than the number of
    facts.
 7. **Repeated content is read again.** The same text in two documents (two revisions of a manual, a mail
    quoted in another) costs two calls. Large tables go to the LLM 60 rows at a time.
-8. **The token limit counts cached prompt tokens in full.** With `anthropic-api`, the system prompt read from
-   the prompt cache costs a tenth, but `--max-tokens` counts it in full, so a run stops earlier than needed.
+8. **The token limit counted cached prompt tokens in full.** With `anthropic-api`, the system prompt read from
+   the prompt cache costs a tenth, but `--max-tokens` counted it in full, so a run stopped earlier than
+   needed. **Solved in 0.4.4**: it counts a tenth. (With `claude-code` the usage reports cache reads too, but
+   how the subscription weighs them is not known: they still count in full.)
 9. **Images and scans** cost one OCR pass each (seconds per page) when `images.reader: ocr` is on; not
    measured at scale.
 
@@ -149,12 +171,12 @@ The time is the wait for the answer only; failed attempts are counted in `failed
 ## Improvements under evaluation
 
 Each needs a measurement and, where it changes the rules or the recipe, the owner's decision. The order is
-the one currently planned; only the first is done.
+the one currently planned; 1, 2 and 11 are done.
 
 | # | Improvement | Expected effect | Cost and risk |
 |---|---|---|---|
 | 1 | **Measure the per-call time in every run report** — **done in 0.4.3** | the numbers above for every instance | none |
-| 2 | **Cache the validation of the answers** | about half of the local time | low |
+| 2 | **Faster validation of the answers** — **done in 0.4.4** (no schema re-check at every answer) | answer validation about 3× faster | none: the same answers are accepted |
 | 3 | **Calls in parallel** (configurable, e.g. 3–6) with the token budget reserved per call | first load and `rebuild` 3–5× faster; same tokens | medium: order of results kept deterministic; limited by the subscription or API rate limits, and by the quota |
 | 4 | **Larger blocks**, after measuring with `curator eval` | input tokens −40–50%, about a third of the calls | quality of extraction on long blocks; longer answers |
 | 5 | **Compact answers** (facts grouped by concept, empty fields omitted, shorter quotes) | output tokens −30–40% | a new prompt version; an instance switches with one `rebuild` |
@@ -163,7 +185,7 @@ the one currently planned; only the first is done.
 | 8 | **Incremental pages, validation and search index** (only the concepts touched) | run and decision time independent of the SSOT size | larger change; the output must stay identical |
 | 9 | **Skip what carries no facts** (tables of contents, boilerplate) and **read repeated blocks once** | fewer calls on manuals and mail | must never skip real content |
 | 10 | **Batch API** for `anthropic-api` | half the cost of a large load | results arrive later (asynchronous) |
-| 11 | **Count cached prompt tokens at their real weight** in the token limit | runs do not stop early | low |
+| 11 | **Count cached prompt tokens at their real weight** in the token limit — **done in 0.4.4** (`anthropic-api`) | runs do not stop early | none |
 
 A rough target for 3 + 4 + 5 together: a call from about 15,500 to 7,000–9,000 tokens, and the total time
 of a first load divided by 5–10. To be confirmed by measurement.
@@ -176,7 +198,7 @@ of a first load divided by 5–10. To be confirmed by measurement.
   (Word, PDF, text notes, spreadsheets), answers with a synthetic backend instead of the LLM (no tokens) and
   times every stage of three runs: first, nothing new, +1% documents. Measured on Linux, 4 cores, Python
   3.13, without OCR. Local times depend on the machine: the first run of 50 documents took 16 s there and
-  60 s on a Windows laptop (same calls, same facts).
+  60 s on a Windows laptop with 0.4.1 (same calls, same facts), mostly the antivirus: see [On Windows](#on-windows).
 
 ```bash
 CURATOR_NOW=2026-10-22T09:00:00+02:00 python -I tools/benchmark/bench_run.py /tmp/bench 500

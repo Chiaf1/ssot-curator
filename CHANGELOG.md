@@ -3,6 +3,15 @@
 All notable changes to `ssot-curator`. Versions follow [semantic versioning](https://semver.org/):
 a change of the instance formats comes with `curator migrate`.
 
+## 0.4.2
+
+- **The redaction tool has moved to its own repository, [ssot-redact](https://github.com/Chiaf1/ssot-redact)**,
+  which depends on the curator; the curator works without it. `tools/prepare_raw.py`, `tools/pdfwrite.py`
+  and the `prep` extra are removed. In its new home it works on whole folders, lists the names to redact
+  (`discover`), replaces emails and phone numbers by itself, redacts mail and skips the formats it cannot
+  redact instead of copying them. README, guide and the `ssot-curator` skill point to it.
+- Examples: files with a fixed date, so the expected SSOT no longer changes with the day of the build.
+
 ## 0.4.1
 
 - Examples: the same bytes on every system and at every build. The WhatsApp chat had CRLF line ends on

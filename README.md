@@ -31,7 +31,7 @@ and the LLM backend, and creates your first instance. Inside the instance, anoth
 over: it runs the curator with your confirmation and walks you through what needs a decision. The rest of
 this README is the same information, written down.
 
-> **Status: 0.4.1.** Three SSOT types, all **drafts**: `plant-support` (technical support of an industrial
+> **Status: 0.4.2.** Three SSOT types, all **drafts**: `plant-support` (technical support of an industrial
 > plant: axes, network devices, alarms, procedures, problems, service tickets) is the generic form of a type
 > used for months on real data; `client-project` (study a client company and follow an engagement) and
 > `software-support` have not been exercised on real data yet. Check the first results of any type and write
@@ -210,11 +210,17 @@ in `curator.yaml` are kept). An instance made by a newer curator is refused.
 
 ## Trying it on real data safely
 
-`tools/prepare_raw.py` (in this repository, not installed with the command) copies selected files from a
-folder of real samples into the `raw/` of a test instance **while redacting** names, customers, emails,
-phone numbers and passwords: in the text of txt, Word, Excel and PDF files, and with black boxes on images
-and scanned PDFs (OCR). It writes a report to review before any file reaches the LLM. See
-[docs/guide.md](docs/guide.md#trying-it-on-real-data-safely).
+The redaction tool has moved to its own repository, **[ssot-redact](https://github.com/Chiaf1/ssot-redact)** (until 0.4.1 it was
+`tools/prepare_raw.py` here). It is installed separately and depends on this one; the curator works without
+it. It makes a redacted copy of a folder of real files — names, customers, emails, phone numbers, in the
+original formats, black boxes on images — straight into the `raw/` of an instance, and verifies it:
+
+```bash
+uv tool install git+https://github.com/Chiaf1/ssot-redact.git
+ssot-redact init redact.yaml --sample ../originals --destination my-instance/raw
+```
+
+Its README and guide explain the workflow; with Claude Code, its `ssot-redact` skill guides you.
 
 ## Documentation
 
@@ -238,12 +244,12 @@ and scanned PDFs (OCR). It writes a report to review before any file reaches the
 Code: [MIT](LICENSE). Documentation: [CC BY 4.0](LICENSE-docs).
 Main dependencies: pypdf (BSD), python-docx (MIT), openpyxl (MIT), PyYAML (MIT), jsonschema (MIT),
 click (BSD), Pillow (MIT-CMU), olefile (BSD); optional: anthropic (MIT) for the `anthropic-api` backend,
-pypdfium2 (Apache-2.0/BSD) for `prepare_raw`, Tesseract (Apache-2.0) as a system program.
+Tesseract (Apache-2.0) as a system program.
 
 ## Development
 
 ```bash
-python -m venv .venv && .venv/bin/pip install -e ".[dev,prep]"     # Windows: .venv\Scripts\pip
+python -m venv .venv && .venv/bin/pip install -e ".[dev]"     # Windows: .venv\Scripts\pip
 .venv/bin/python -m pytest -q
 ```
 

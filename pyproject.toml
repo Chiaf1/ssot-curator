@@ -23,7 +23,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "anthropic>=1.0"]
-prep = ["pypdfium2>=4"]      # only tools/prepare_raw.py: renders scanned PDF pages (Apache-2.0 / BSD-3)
 api = ["anthropic>=1.0"]      # anthropic-api backend
 
 [project.scripts]

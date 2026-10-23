@@ -341,35 +341,23 @@ quota.
 
 ## 12. Trying it on real data safely
 
-Before sending real files to an LLM service, you can test the tool on a redacted copy:
+Before sending real files to an LLM service, you can make a redacted copy of them with
+**[ssot-redact](https://github.com/Chiaf1/ssot-redact)**, the companion tool of the curator, in its own repository (until 0.4.1 it was
+`tools/prepare_raw.py` in this one). The curator does not need it; install it only if you redact:
 
 ```bash
-python tools/prepare_raw.py redact.yaml          # first time: copy + redact + verify
-python tools/prepare_raw.py redact.yaml --add    # later: only the listed files not yet copied
-python tools/prepare_raw.py redact.yaml --verify # verification only
+uv tool install git+https://github.com/Chiaf1/ssot-redact.git     # installs the curator too, if missing
 ```
 
-`redact.yaml` lists the files to copy (`files: [{from, to}]`), the substitutions (`substitutions:
-[["Real Name", "Technician 1"], …]`, longest forms first), extra terms to look for (`forbidden_extra`),
-capitalized words that are fine (`allowed`) and, for images and scans, `ocr: {command, languages}`.
-**Keep it outside any repository and outside `raw/`**, because it contains the real names.
+It works on whole folders and writes straight into the `raw/` of an instance (`destination:`, with `map:`
+to put each folder of the originals in the right folder of `raw/`):
+- it lists the names to redact for you (`ssot-redact discover`);
+- it replaces them in the original formats, together with emails and phone numbers;
+- it covers names on images and scans with black boxes;
+- it verifies the result in a report to read before any file reaches the LLM.
 
-What the tool does:
-- txt, Word and Excel files are redacted in their own format;
-- PDFs with text are rebuilt as text only, one page per original page, so citations by page stay valid;
-- images and scanned PDFs get black boxes on the words to hide (also names over several words, emails,
-  phone numbers), and their metadata (EXIF, GPS) are dropped.
-
-The report (`redact-report.md`) lists:
-- replacements and black boxes;
-- forbidden terms still present;
-- emails, phone-like numbers and capitalized words to review;
-- for images, the words read with low OCR confidence. OCR can misread a name, which then is not covered:
-  look at the images yourself.
-
-Run it, read the report, look at the files, and only then run the curator. The tool lives in a clone of
-this repository: install it there with `pip install -e ".[prep]"` (the `prep` extra adds pypdfium2), plus
-Tesseract for images.
+Its [guide](https://github.com/Chiaf1/ssot-redact/blob/main/docs/guide.md) explains the workflow, and with Claude Code its
+`ssot-redact` skill guides you step by step.
 
 ## 13. Troubleshooting
 

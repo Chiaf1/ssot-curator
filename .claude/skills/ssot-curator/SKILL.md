@@ -1,6 +1,6 @@
 ---
 name: ssot-curator
-description: Guide someone who has cloned or downloaded the ssot-curator repository - explain what the tool is for, check the requirements, install the `curator` command, try it with the demo, create a first SSOT instance of the right type (or design their own type with them), and hand over to the `ssot` skill inside the instance. Use when the user asks what this repository is, how to install or try it, which type to choose, how to create their own type, or how to start an SSOT.
+description: Guide someone who has cloned or downloaded the ssot-curator repository - explain what the tool is for, check the requirements, install the `curator` command, try it with the demo, create a first SSOT instance of the right type (or design their own type with them), and hand over to the `ssot` skill inside the instance. Use when the user asks what this repository is, how to install or try it, which type to choose, how to create their own type, how to start an SSOT, or how to redact real data before using it (the separate ssot-redact tool).
 ---
 
 # Getting someone started with ssot-curator
@@ -45,7 +45,7 @@ Sources of truth: `README.md`, `docs/guide.md` (use), `docs/architecture.md` (ru
 
 From this folder: `uv tool install .`. From GitHub: `uv tool install git+<repository URL>` (latest), or
 `uv tool install git+<repository URL>@vX.Y.Z` for a chosen release. Check with `curator --version`. To work on the code instead:
-`python -m venv .venv`, then `pip install -e ".[dev,prep]"`, then `pytest -q`.
+`python -m venv .venv`, then `pip install -e ".[dev]"`, then `pytest -q`.
 
 ### Show it working first (no quota)
 
@@ -130,11 +130,26 @@ they need something the YAML cannot express, say so plainly instead of working a
 5. Tell them to **open the instance folder with Claude Code**: the `ssot` skill there takes over (review,
    decisions, backup, deletion), and its permissions stop the agent from writing the SSOT.
 
+## 5b. If they need to redact real data
+
+Redaction is **not** in this repository: it is the separate tool **ssot-redact**
+(https://github.com/Chiaf1/ssot-redact), which depends on the curator (the curator does not need it). If
+they must hide names, customers, emails or phone numbers before the files reach an LLM:
+1. tell them it exists and what it does (a redacted copy of a whole folder, in the original formats,
+   written straight into `raw/`, with a verification report);
+2. with their yes, install it: `uv tool install git+https://github.com/Chiaf1/ssot-redact.git`;
+3. point them to its guide (`docs/guide.md` of that repository) and to its `ssot-redact` skill, which
+   guides the redaction step by step: open a clone of ssot-redact with Claude Code, or follow the guide.
+
+Its `destination:` can be the `raw/` of the instance, with `map:` to put each folder of the originals in
+the right folder of `raw/`. Do not redact by hand or with ad-hoc scripts instead.
+
 ## 6. Tell them where to be careful
 
 - Costs: dry-run first, always a `--max-tokens` limit; large tables and long manuals cost the most.
 - Real or personal data: they are responsible for what they send to an LLM service. To try safely, use
-  `tools/prepare_raw.py` to make a redacted copy (see `docs/guide.md`, "Trying it on real data safely").
+  **ssot-redact**, the redaction tool in its own repository (section 5b): it makes a redacted copy
+  straight into `raw/` and verifies it. The curator works without it.
 - Images are read only with `images.reader: ocr` (local Tesseract); OCR misreads small text.
 - The SSOT never replaces the original documents for safety procedures and parameters.
 - Back up the instance (`backup:` in `curator.yaml`, `curator backup`, `curator backup --verify`).

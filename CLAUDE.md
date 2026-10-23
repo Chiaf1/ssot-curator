@@ -36,7 +36,7 @@ place to start.
 
 ## Commands
 ```bash
-python -m venv .venv && .venv/bin/pip install -e ".[dev,prep]"   # Windows: .venv\Scripts\pip
+python -m venv .venv && .venv/bin/pip install -e ".[dev]"   # Windows: .venv\Scripts\pip
 .venv/bin/python -m pytest -q
 .venv/bin/curator --help
 ```

@@ -5,16 +5,17 @@ one after the other, and every call costs about 15,000 tokens. With a few dozen 
 matter; with thousands, the first load takes many hours and a large share of a subscription's quota.
 
 This page states the limits with measured numbers, explains what you can do today, and lists the
-improvements under evaluation. **None of the improvements below is implemented yet**: the page will say
-when one is, and in which version.
+improvements under evaluation. **Only the first improvement is implemented** (in 0.4.3: the time of every
+call in the run report); the table says when another one is, and in which version.
 
-Measured on version 0.4.1 (0.4.2 has the same code). Last updated: 2026-10-23.
+Measured on version 0.4.1 (0.4.2 and 0.4.3 read and call the LLM in the same way). Last updated: 2026-10-23.
 
 - [In short](#in-short)
 - [Where the time and the tokens go](#where-the-time-and-the-tokens-go)
 - [Known limits](#known-limits)
 - [Estimating a large load](#estimating-a-large-load)
 - [What you can do today](#what-you-can-do-today)
+- [Measuring your instance](#measuring-your-instance)
 - [Improvements under evaluation](#improvements-under-evaluation)
 - [How the numbers were measured](#how-the-numbers-were-measured)
 
@@ -128,14 +129,31 @@ All of this works with the current version, without changes to the code:
 - **Avoid needless `rebuild`.** Changing a hint, a prompt or the model makes `rebuild` read everything again;
   for one folder, `curator run` after the change reads only what is new.
 
+## Measuring your instance
+
+Since 0.4.3 the summary of `curator run`, `curator rebuild` and `curator eval` shows, when the LLM was
+called, how long the run took, how much of it was waiting for the LLM, and the seconds and tokens per call
+of each task (the format; the numbers are an example):
+
+```
+  time: 12.5 min, of which waiting for the LLM 11.9 min
+    interpret: 20 calls, 33.1 s per call, 9960 input + 5571 output tokens per call
+    reconcile: 2 calls, 26.5 s per call, 6100 input + 1800 output tokens per call
+```
+
+The report of every run (`state/runs/<run>.json`) keeps the same numbers: `wall_seconds`, `llm_seconds`
+and `llm_by_task` (per task: `calls`, `failed` attempts, `seconds`, `input_tokens`, `output_tokens`).
+The time is the wait for the answer only; failed attempts are counted in `failed` and in the time.
+`python tools/benchmark/run_times.py <instance>` sums them over all the runs of an instance (0 tokens).
+
 ## Improvements under evaluation
 
-Not implemented. Each needs a measurement and, where it changes the rules or the recipe, the owner's
-decision. The order is the one currently planned.
+Each needs a measurement and, where it changes the rules or the recipe, the owner's decision. The order is
+the one currently planned; only the first is done.
 
 | # | Improvement | Expected effect | Cost and risk |
 |---|---|---|---|
-| 1 | **Measure the per-call time in every run report** | the numbers above for every instance | none |
+| 1 | **Measure the per-call time in every run report** — **done in 0.4.3** | the numbers above for every instance | none |
 | 2 | **Cache the validation of the answers** | about half of the local time | low |
 | 3 | **Calls in parallel** (configurable, e.g. 3–6) with the token budget reserved per call | first load and `rebuild` 3–5× faster; same tokens | medium: order of results kept deterministic; limited by the subscription or API rate limits, and by the quota |
 | 4 | **Larger blocks**, after measuring with `curator eval` | input tokens −40–50%, about a third of the calls | quality of extraction on long blocks; longer answers |

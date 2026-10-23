@@ -3,8 +3,13 @@
 All notable changes to `ssot-curator`. Versions follow [semantic versioning](https://semver.org/):
 a change of the instance formats comes with `curator migrate`.
 
-## Unreleased
+## 0.4.3
 
+- **The time of every LLM call is measured** (first item of `docs/performance.md`). The summary of `run`,
+  `rebuild` and `eval` shows how long the run took, how much of it was waiting for the LLM, and the seconds
+  and tokens per call of each task (interpret, reconcile, quote_check, entities). The run report keeps
+  `wall_seconds`, `llm_seconds` and `llm_by_task` (calls, failed attempts, seconds, input and output
+  tokens); `tools/benchmark/run_times.py` sums them over an instance.
 - `docs/performance.md`: the known limits on large volumes, with measured numbers (sequential calls, about
   30-45 s and 13,000-16,500 tokens per call, the whole SSOT regenerated at every run), how to estimate a
   load, what to do today and the improvements under evaluation. The README and the guide point to it.

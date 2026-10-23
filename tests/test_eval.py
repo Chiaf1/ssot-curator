@@ -47,6 +47,8 @@ def test_eval_without_run_calls_the_llm_and_shares_the_cache(inst_eval):
     b = backend()
     res = evaluate(inst_eval, inst_eval.config(), b)
     assert res["llm_calls"] == 6                              # 5 chunks + 1 reconciliation batch
+    assert res["llm_by_task"]["interpret"]["calls"] == 5 and res["llm_by_task"]["reconcile"]["calls"] == 1
+    assert res["llm_seconds"] >= 0
     b2 = backend()
     rep = Curator(inst_eval, backend=b2).run()
     interp = [c for c in b2.calls if '"concepts"' not in c]

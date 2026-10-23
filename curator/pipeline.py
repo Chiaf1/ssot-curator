@@ -11,6 +11,7 @@ import json
 import shutil
 import sqlite3
 import subprocess
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
@@ -34,6 +35,7 @@ from curator.ocr import image_reader
 from curator.parts import PartFile, expand_documents, load_part
 from curator.interpret import allowed_types, chunk_request, prompt_version, source_header
 from curator.llm import LLMBackend, LLMError, make_backend, validate_output
+from curator.llm.base import record_attempt
 from curator.llm.cache import LLMCache
 from curator.quarantine import check_document
 from curator.render import render_bundle
@@ -80,6 +82,9 @@ class RunReport:
     token_budget: int = 0
     cost_usd: float = 0.0
     cost_estimated: float | None = None    # dry run: $ from the token estimate, when the price is known
+    wall_seconds: float = 0.0       # duration of the run
+    llm_seconds: float = 0.0        # of which waiting for the LLM (failed attempts included); the rest is local
+    llm_by_task: dict = field(default_factory=dict)   # task → calls, failed, seconds, input/output tokens
     stopped_by_budget: bool = False
     pending_documents: int = 0
     backup: str = ""                # path of the backup made at the end of the run (periodic backup)
@@ -353,7 +358,7 @@ class Curator:
     def _run(self, dry_run: bool, max_tokens: int | None, only: list[str], fresh: bool = False,
              no_cache: bool = False, kind: str = "run", decision: decisionlog.Decision | None = None) -> RunReport:
         inst, cfg = self.inst, self.cfg
-        started = now()
+        started, t0 = now(), time.perf_counter()
         run_id = started.strftime("%Y%m%dT%H%M%S") + ("-rebuild" if kind == "rebuild" else "-forget" if kind == "forget"
                                                       else "-" + decision.id if decision else "")
         rep = RunReport(run_id=run_id, started=iso(started), backend=cfg.backend, dry_run=dry_run, kind=kind,
@@ -476,6 +481,7 @@ class Curator:
             shutil.rmtree(staging, ignore_errors=True)
 
         rep.finished = iso(now())
+        rep.wall_seconds = round(time.perf_counter() - t0, 3)
         if not dry_run:
             inst.runs.mkdir(parents=True, exist_ok=True)
             (inst.runs / f"{run_id}.json").write_text(rep.to_json(), encoding="utf-8", newline="\n")
@@ -570,7 +576,7 @@ class Curator:
                     con.execute("UPDATE sources SET status = 'partial' WHERE doc_id = ?", (doc_id,))
                     drep["status"] = "partial"
                     raise BudgetExhausted()
-                entry = self._call(system, content, schema, rep)
+                entry = self._call(system, content, schema, rep, "interpret")
                 if entry is None:
                     con.execute("INSERT OR REPLACE INTO chunks(chunk_id, doc_id, idx, status, cache_key, error) "
                                 "VALUES (?,?,?,?,?,?)", (ch.chunk_id, doc_id, ch.index, "error", key, rep.errors[-1]))
@@ -610,22 +616,36 @@ class Curator:
             est = max(est, rep.tokens_used // rep.llm_calls)
         return est
 
-    def _call(self, system: str, content: str, schema: dict, rep: RunReport) -> dict | None:
+    def _call(self, system: str, content: str, schema: dict, rep: RunReport, task: str) -> dict | None:
         last = None
         for _ in range(2):   # an invalid response is retried once
+            t = time.perf_counter()
             try:
                 res = self.backend.complete(system, content, schema)
-                rep.llm_calls += 1
-                rep.tokens_used += res.total_tokens
-                rep.cost_usd += res.cost_usd
-                rep.model = res.model
+            except LLMError as e:
+                self._timed(rep, task, t, None)
+                last = e
+                continue
+            self._timed(rep, task, t, res)
+            rep.llm_calls += 1
+            rep.tokens_used += res.total_tokens
+            rep.cost_usd += res.cost_usd
+            rep.model = res.model
+            try:
                 validate_output(res.data, schema)
-                return {"data": res.data, "model": res.model, "at": iso(now()),
-                        "input_tokens": res.input_tokens, "output_tokens": res.output_tokens}
             except LLMError as e:
                 last = e
+                continue
+            return {"data": res.data, "model": res.model, "at": iso(now()),
+                    "input_tokens": res.input_tokens, "output_tokens": res.output_tokens}
         rep.errors.append(f"LLM: {last}")
         return None
+
+    @staticmethod
+    def _timed(rep: RunReport, task: str, t0: float, res) -> None:
+        seconds = time.perf_counter() - t0
+        record_attempt(rep.llm_by_task, task, seconds, res)
+        rep.llm_seconds = round(rep.llm_seconds + seconds, 3)
 
     def _store_facts(self, con, rep: RunReport, doc_id: str, ch: Chunk, items: list[dict], meta: CuratedMeta,
                      entry: dict, doc_text: str) -> int:
@@ -691,7 +711,7 @@ class Curator:
                 rep.tokens_estimated += est if dry_run else 0
                 counts["pending"] += len(batch)
                 continue
-            entry = self._call(system, content, qc.schema([f["fact_id"] for f, _ in batch]), rep)
+            entry = self._call(system, content, qc.schema([f["fact_id"] for f, _ in batch]), rep, "quote_check")
             got = {c["id"]: c for c in (entry or {}).get("data", {}).get("checks", [])}
             for f, key in batch:
                 if f["fact_id"] not in got:
@@ -763,7 +783,7 @@ class Curator:
                     con.execute("INSERT OR REPLACE INTO pending_reconcile(concept_uid, reason) VALUES (?,?)",
                                 (uid, "to be compared at the next run with the LLM"))
                 continue
-            entry = self._call(system, content, schema, rep)
+            entry = self._call(system, content, schema, rep, "reconcile")
             rep.reconcile["called"] += len(batch)
             got = {c["concept"]: c["relations"] for c in (entry or {}).get("data", {}).get("concepts", [])}
             for uid, payload, clusters, key in batch:
@@ -831,7 +851,7 @@ class Curator:
                     if rep.tokens_used + self._estimate(system + content, rep) > rep.token_budget:
                         rep.stopped_by_budget = True
                         break
-                    entry = self._call(system, content, entity_schema([c["uid"] for c in payload]), rep)
+                    entry = self._call(system, content, entity_schema([c["uid"] for c in payload]), rep, "entities")
                     if entry is None:
                         continue
                     cache.put(key, entry)
@@ -844,7 +864,8 @@ class Curator:
             con.commit()
             con.close()
             return {"proposals": out, "llm_calls": rep.llm_calls, "cache_hits": rep.cache_hits,
-                    "tokens_used": rep.tokens_used, "stopped_by_budget": rep.stopped_by_budget, "errors": rep.errors}
+                    "tokens_used": rep.tokens_used, "stopped_by_budget": rep.stopped_by_budget, "errors": rep.errors,
+                    "llm_seconds": rep.llm_seconds, "llm_by_task": rep.llm_by_task}
 
     # --- OKF regeneration only ---------------------------------------------------------------
 

@@ -187,6 +187,7 @@ row gives several facts.
 **Large volumes.** Calls are made one at a time, about 30-45 seconds and 13,000-16,500 tokens each: a first
 load of thousands of documents takes many hours and several runs. Before one, read
 [performance.md](performance.md): how to estimate it, what to do today, and the improvements planned.
+After a run, its summary shows how long it waited for the LLM and the seconds and tokens per call.
 
 ## 5. Reviewing and deciding
 

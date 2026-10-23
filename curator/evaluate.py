@@ -16,6 +16,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import re
+import time
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
@@ -102,6 +103,8 @@ class EvalReport:
     llm_calls: int = 0
     cache_hits: int = 0
     tokens_used: int = 0
+    llm_seconds: float = 0.0          # waiting for the LLM, failed attempts included
+    llm_by_task: dict = field(default_factory=dict)   # task → calls, failed, seconds, input/output tokens
     stopped_by_budget: bool = False
     pending_cases: list[str] = field(default_factory=list)
     details: list[dict] = field(default_factory=list)
@@ -226,21 +229,35 @@ class Evaluator:
             con.close()
         return aliases
 
-    def _call(self, system, content, schema, rep: EvalReport) -> dict | None:
-        from curator.llm.base import LLMError, validate_output
+    def _call(self, system, content, schema, rep: EvalReport, task: str) -> dict | None:
+        from curator.llm.base import LLMError, record_attempt, validate_output
+
+        def timed(t0, res):
+            seconds = time.perf_counter() - t0
+            record_attempt(rep.llm_by_task, task, seconds, res)
+            rep.llm_seconds = round(rep.llm_seconds + seconds, 3)
+
         last = None
         for _ in range(2):
+            t = time.perf_counter()
             try:
                 res = self.backend.complete(system, content, schema)
-                rep.llm_calls += 1
-                rep.tokens_used += res.total_tokens
-                if res.model not in rep.models_used:
-                    rep.models_used.append(res.model)
+            except LLMError as e:
+                timed(t, None)
+                last = e
+                continue
+            timed(t, res)
+            rep.llm_calls += 1
+            rep.tokens_used += res.total_tokens
+            if res.model not in rep.models_used:
+                rep.models_used.append(res.model)
+            try:
                 validate_output(res.data, schema)
-                return {"data": res.data, "model": res.model, "at": iso(now()),
-                        "input_tokens": res.input_tokens, "output_tokens": res.output_tokens}
             except LLMError as e:
                 last = e
+                continue
+            return {"data": res.data, "model": res.model, "at": iso(now()),
+                    "input_tokens": res.input_tokens, "output_tokens": res.output_tokens}
         rep.errors.append(f"LLM: {last}")
         return None
 
@@ -290,7 +307,7 @@ class Evaluator:
                     rep.stopped_by_budget = rep.stopped_by_budget or self.allow_llm
                     rep.pending_cases.append(case["id"])
                     continue
-                entry = self._call(system, content, schema, rep)
+                entry = self._call(system, content, schema, rep, "interpret")
                 if entry is None:
                     rep.pending_cases.append(case["id"])
                     continue
@@ -343,7 +360,7 @@ class Evaluator:
                 todo.append((case["id"], payload, key))
         if todo and self.allow_llm and self._budget_ok(rep):
             content = json.dumps({"concepts": [t[1] for t in todo]}, ensure_ascii=False, indent=1)
-            entry = self._call(rc.system_prompt(), content, rc.build_schema([t[0] for t in todo]), rep)
+            entry = self._call(rc.system_prompt(), content, rc.build_schema([t[0] for t in todo]), rep, "reconcile")
             if entry is not None:
                 got = {c["concept"]: c["relations"] for c in entry["data"]["concepts"]}
                 for cid, _, key in todo:

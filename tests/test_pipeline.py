@@ -200,6 +200,7 @@ def test_invalid_llm_output_retried_then_reported(instance):
             return r
     rep = Curator(instance, backend=Bad(None)).run()
     assert rep.llm_calls == 12                                       # every chunk retried once
+    assert rep.llm_by_task["interpret"]["calls"] == 12 and rep.llm_by_task["interpret"]["failed"] == 0  # answered
     assert rep.errors and all("schema" in e for e in rep.errors)
     assert rep.facts_new == 0 and rep.pending_documents == 6         # still to be processed
 
@@ -285,3 +286,43 @@ def test_init_creates_the_claude_code_files(instance):
     assert fm["name"] == "ssot" and len(fm["description"]) < 1536
     for cmd in ("curator run", "curator refile", "curator forget", "curator entities --propose", "--dry-run"):
         assert cmd in skill
+
+
+def test_run_report_times_every_llm_call(instance):
+    """Seconds and tokens per call of each task, in the report and in the summary; nothing when all is cached."""
+    import time
+    from conftest import make_examples
+    from curator.cli import _run_lines
+
+    class Slow(FakeBackend):
+        def complete(self, system, content, schema):
+            time.sleep(0.02)
+            return super().complete(system, content, schema)
+
+    rep = Curator(instance, backend=Slow(make_examples.LLM_FIXTURES)).run()
+    tasks = rep.llm_by_task
+    assert tasks["interpret"]["calls"] == 6                    # one per chunk; nothing to reconcile in these examples
+    assert sum(t["calls"] for t in tasks.values()) == rep.llm_calls
+    assert sum(t["input_tokens"] + t["output_tokens"] for t in tasks.values()) == rep.tokens_used
+    assert all(t["failed"] == 0 and t["seconds"] >= 0.02 * t["calls"] for t in tasks.values())
+    assert rep.wall_seconds >= rep.llm_seconds >= 0.02 * rep.llm_calls
+    saved = json.loads((instance.runs / f"{rep.run_id}.json").read_text(encoding="utf-8"))
+    assert saved["llm_by_task"] == tasks and saved["llm_seconds"] == rep.llm_seconds
+    lines = "\n".join(_run_lines(rep))
+    assert "waiting for the LLM" in lines and "interpret: " in lines and "s per call" in lines
+
+    again = Curator(instance, backend=Slow(make_examples.LLM_FIXTURES)).rebuild()   # all from the cache
+    assert again.llm_calls == 0 and again.llm_by_task == {} and again.llm_seconds == 0
+    assert "waiting for the LLM" not in "\n".join(_run_lines(again))
+
+
+def test_failed_llm_attempts_are_timed_as_failed(instance):
+    from curator.llm import LLMError
+
+    class Down(FakeBackend):
+        def complete(self, system, content, schema):
+            raise LLMError("service unavailable")
+    rep = Curator(instance, backend=Down(None)).run()
+    t = rep.llm_by_task["interpret"]
+    assert rep.llm_calls == 0 and t["calls"] == 0 and t["failed"] == 12          # every chunk tried twice
+    assert t["input_tokens"] == 0 and rep.errors

@@ -149,7 +149,8 @@ the right folder of `raw/`. Do not redact by hand or with ad-hoc scripts instead
 - Costs: dry-run first, always a `--max-tokens` limit; large tables and long manuals cost the most.
 - Large volumes: the curator is slow on thousands of documents (sequential calls, about 30-45 s and 13-16k
   tokens each). Before a large load, go through `docs/performance.md` with them: the estimate from the dry
-  run, what they can do today, and the known limits with the improvements planned (none implemented yet).
+  run, what they can do today, and the known limits with the improvements planned. After a run, the
+  summary shows the seconds and tokens per call: use them to estimate the rest of the load.
 - Real or personal data: they are responsible for what they send to an LLM service. To try safely, use
   **ssot-redact**, the redaction tool in its own repository (section 5b): it makes a redacted copy
   straight into `raw/` and verifies it. The curator works without it.

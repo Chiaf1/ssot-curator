@@ -11,6 +11,7 @@ import click
 from curator import __version__
 from curator.config import ConfigError
 from curator.instance import Instance, InstanceError, WriterLock, find_instance
+from curator.llm.base import timing_lines
 
 PATH = click.Path(path_type=Path)
 from curator.config import BACKENDS as _BACKENDS  # noqa: E402
@@ -153,6 +154,12 @@ def run(path, dry_run, only, max_tokens, fail_on_pending, as_json):
         sys.exit(2)
 
 
+def _duration(seconds: float) -> str:
+    if seconds < 120:
+        return f"{seconds:.0f} s"
+    return f"{seconds / 60:.1f} min" if seconds < 3600 else f"{seconds / 3600:.1f} h"
+
+
 def _run_lines(rep, dry_run: bool = False, only=()) -> list[str]:
     human = [
         f"Run {rep.run_id}{' (dry run)' if dry_run else ''}",
@@ -172,6 +179,9 @@ def _run_lines(rep, dry_run: bool = False, only=()) -> list[str]:
         f"  documents still pending: {rep.pending_documents}"
         + (f" | excluded by --only: {rep.skipped_by_only}" if only else ""),
     ]
+    if rep.llm_by_task:
+        human.append(f"  time: {_duration(rep.wall_seconds)}, of which waiting for the LLM {_duration(rep.llm_seconds)}")
+        human += [f"    {line}" for line in timing_lines(rep.llm_by_task)]
     for s in rep.to_review:
         human.append(f"  CHECK BY HAND: raw/{s['raw_paths'][0]}: {s['rejected']} of {s['proposed']} facts rejected "
                      "by the verification (keep it, or exclude it with an ignore rule)")
@@ -368,6 +378,7 @@ def rebuild(path, no_cache, max_tokens, as_json):
     _emit(as_json, json.loads(rep.to_json()),
           f"Regeneration {rep.run_id}: {len(rep.documents)} documents, {rep.llm_calls} LLM calls, "
           f"{rep.cache_hits} from cache; decisions re-applied {rep.decisions.get('applied')}/{rep.decisions.get('total')}"
+          + "".join(f"\n  {line}" for line in timing_lines(rep.llm_by_task))
           + "".join(f"\n  VALIDATION: {e}" for e in rep.validation_errors)
           + (f"\n  commit {rep.commit}" if rep.commit else ""))
     sys.exit(1 if rep.validation_errors else 0)
@@ -832,6 +843,7 @@ def eval_cmd(path, save_baseline, pattern, sources, case_ids, model, prompt, bas
         human.append(f"  distinct {t}: {d['produced']} produced, {d['expected']} expected")
     human.append(f"  LLM: {result['llm_calls']} calls, {result['cache_hits']} from cache, {result['tokens_used']} tokens"
                  + (" — TOKEN LIMIT REACHED" if result["stopped_by_budget"] else ""))
+    human += [f"    {line}" for line in timing_lines(result.get("llm_by_task") or {})]
     if result["pending_cases"]:
         human.append(f"  not evaluated: {', '.join(result['pending_cases'])}")
     comp = result.get("comparison")

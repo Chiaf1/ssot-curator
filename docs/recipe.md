@@ -95,7 +95,7 @@ Every command finds the instance from `--instance` or the current folder, and su
 
 ```yaml
 schema_version: 1
-curator_version: "0.4.2"          # written by init, updated by migrate
+curator_version: "0.4.3"          # written by init, updated by migrate
 instance: {name: my-ssot, type: client-project, language: en, owner: owner}
 llm: {backend: claude-code, model: "", timeout_seconds: 300, max_tokens_per_run: 400000, cache: true}
 chunking: {max_tokens: 3000, overlap_tokens: 150, table_rows_per_chunk: 60}

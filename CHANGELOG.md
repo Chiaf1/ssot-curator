@@ -3,6 +3,13 @@
 All notable changes to `ssot-curator`. Versions follow [semantic versioning](https://semver.org/):
 a change of the instance formats comes with `curator migrate`.
 
+## Unreleased
+
+- `docs/performance.md`: the known limits on large volumes, with measured numbers (sequential calls, about
+  30-45 s and 13,000-16,500 tokens per call, the whole SSOT regenerated at every run), how to estimate a
+  load, what to do today and the improvements under evaluation. The README and the guide point to it.
+- `tools/benchmark/`: the scripts that measured them (synthetic corpus and backend; run reports).
+
 ## 0.4.2
 
 - **The redaction tool has moved to its own repository, [ssot-redact](https://github.com/Chiaf1/ssot-redact)**,

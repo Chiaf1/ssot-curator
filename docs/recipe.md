@@ -58,7 +58,7 @@ curator/
     └── demo/llm/     # stored answers of the fake backend for the synthetic examples
 examples/expected/    # the SSOT the synthetic examples give (compared byte by byte by the tests)
 eval/                 # synthetic evaluation set of the template (format in eval/README.md)
-tools/                # check_terms.py, check_secrets.py (redaction: the separate ssot-redact repository)
+tools/                # check_terms.py, check_secrets.py, benchmark/ (docs/performance.md); redaction: ssot-redact
 tests/
 ```
 

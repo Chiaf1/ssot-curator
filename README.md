@@ -37,6 +37,15 @@ this README is the same information, written down.
 > `software-support` have not been exercised on real data yet. Check the first results of any type and write
 > a few evaluation cases (`curator eval`).
 
+## Performance and known limits
+
+**Slow on large volumes, for now.** Every block of every document is one LLM call, made one after the other:
+about 30-45 seconds and 13,000-16,500 tokens per call with the `claude-code` backend. 1,000 small documents
+take 11-17 hours and about 13 million tokens on the first load; after that, only new documents cost.
+The measured numbers, how to estimate a load, what you can do today and the improvements we are
+evaluating (parallel calls, larger blocks, compact answers, incremental work) are in
+**[docs/performance.md](docs/performance.md)**.
+
 ## How it works
 
 ```
@@ -225,6 +234,7 @@ Its README and guide explain the workflow; with Claude Code, its `ssot-redact` s
 ## Documentation
 
 - [docs/guide.md](docs/guide.md) — user guide: workflow, decisions, costs, images, backup, deletion, troubleshooting.
+- [docs/performance.md](docs/performance.md) — performance on large volumes: known limits, estimates, plans.
 - [docs/architecture.md](docs/architecture.md) — the rules of the SSOT and how the curator keeps them.
 - [docs/recipe.md](docs/recipe.md) — implementation: modules, configuration, commands, tests.
 - [CHANGELOG.md](CHANGELOG.md).

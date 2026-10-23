@@ -184,6 +184,10 @@ the model or a source changed.
 answers: **real use is usually 20-25% higher**. Long tables are the most expensive sources, because one
 row gives several facts.
 
+**Large volumes.** Calls are made one at a time, about 30-45 seconds and 13,000-16,500 tokens each: a first
+load of thousands of documents takes many hours and several runs. Before one, read
+[performance.md](performance.md): how to estimate it, what to do today, and the improvements planned.
+
 ## 5. Reviewing and deciding
 
 `curator status` lists what waits for you:
